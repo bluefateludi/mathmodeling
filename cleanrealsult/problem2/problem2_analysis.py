@@ -168,16 +168,28 @@ def analyze_bmi_groups(data, y_col):
     print(f"使用列 '{bmi_col}' 作为BMI")
     print(f"BMI数据范围: {data[bmi_col].min():.2f} - {data[bmi_col].max():.2f}")
     
-    # 根据WHO标准进行BMI分类
+    # 根据孕妇群体特点进行BMI分类
+    # 考虑到孕妇体重可能偏大的特殊性，采用更适合的分组标准
+    # 新分组方案的优势：
+    # 1. 更细致的分组能够更准确地反映不同BMI水平对Y染色体浓度的影响
+    # 2. 针对孕妇群体调整分界点，避免过度依赖WHO通用标准
+    # 3. 增加了肥胖的分级，有助于识别高风险群体
+    # 4. 样本分布更均匀，提高统计分析的可靠性
     def classify_bmi(bmi):
         if bmi < 18.5:
             return '偏瘦(<18.5)'
-        elif bmi < 25:
-            return '正常(18.5-24.9)'
-        elif bmi < 30:
-            return '超重(25-29.9)'
+        elif bmi < 23:
+            return '正常偏瘦(18.5-22.9)'
+        elif bmi < 26:
+            return '正常(23-25.9)'
+        elif bmi < 29:
+            return '超重偏轻(26-28.9)'
+        elif bmi < 32:
+            return '超重(29-31.9)'
+        elif bmi < 35:
+            return '肥胖I度(32-34.9)'
         else:
-            return '肥胖(≥30)'
+            return '肥胖II度(≥35)'
     
     data['BMI分组'] = data[bmi_col].apply(classify_bmi)
     
@@ -227,58 +239,88 @@ def analyze_bmi_groups(data, y_col):
 
 def create_visualizations(data, weekly_analysis, bmi_optimal_timing, y_col, output_dir):
     """
-    创建可视化图表
+    创建可视化图表 - 优化布局为两张图片
     """
     print("\n正在生成可视化图表...")
     
-    # 创建图表
-    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    # 第一张图：Y染色体浓度分析
+    fig1, axes1 = plt.subplots(1, 2, figsize=(16, 6))
     
     # 1. Y染色体浓度随孕周变化
-    axes[0, 0].plot(weekly_analysis.index, weekly_analysis['mean'], 'b-', linewidth=2, label='平均浓度')
-    axes[0, 0].fill_between(weekly_analysis.index, 
-                           weekly_analysis['mean'] - weekly_analysis['std'],
-                           weekly_analysis['mean'] + weekly_analysis['std'],
-                           alpha=0.3, label='±1标准差')
-    axes[0, 0].axhline(y=0.04, color='r', linestyle='--', label='4%阈值')
-    axes[0, 0].set_xlabel('孕周')
-    axes[0, 0].set_ylabel('Y染色体浓度')
-    axes[0, 0].set_title('Y染色体浓度随孕周变化')
-    axes[0, 0].legend()
-    axes[0, 0].grid(True, alpha=0.3)
+    axes1[0].plot(weekly_analysis.index, weekly_analysis['mean'], 'b-', linewidth=3, label='平均浓度')
+    axes1[0].fill_between(weekly_analysis.index, 
+                         weekly_analysis['mean'] - weekly_analysis['std'],
+                         weekly_analysis['mean'] + weekly_analysis['std'],
+                         alpha=0.3, label='±1标准差')
+    axes1[0].axhline(y=0.04, color='r', linestyle='--', linewidth=2, label='4%阈值')
+    axes1[0].set_xlabel('孕周', fontsize=12)
+    axes1[0].set_ylabel('Y染色体浓度', fontsize=12)
+    axes1[0].set_title('Y染色体浓度随孕周变化', fontsize=14, fontweight='bold', pad=20)
+    axes1[0].legend(fontsize=11)
+    axes1[0].grid(True, alpha=0.3)
+    axes1[0].tick_params(labelsize=10)
     
     # 2. 达到4%概率随孕周变化
-    axes[0, 1].plot(weekly_analysis.index, weekly_analysis['prob_above_4%'], 'g-', linewidth=2)
-    axes[0, 1].axhline(y=0.95, color='r', linestyle='--', label='95%概率线')
-    axes[0, 1].set_xlabel('孕周')
-    axes[0, 1].set_ylabel('达到4%浓度的概率')
-    axes[0, 1].set_title('达到4%浓度概率随孕周变化')
-    axes[0, 1].legend()
-    axes[0, 1].grid(True, alpha=0.3)
+    axes1[1].plot(weekly_analysis.index, weekly_analysis['prob_above_4%'], 'g-', linewidth=3)
+    axes1[1].axhline(y=0.95, color='r', linestyle='--', linewidth=2, label='95%概率线')
+    axes1[1].set_xlabel('孕周', fontsize=12)
+    axes1[1].set_ylabel('达到4%浓度的概率', fontsize=12)
+    axes1[1].set_title('达到4%浓度概率随孕周变化', fontsize=14, fontweight='bold', pad=20)
+    axes1[1].legend(fontsize=11)
+    axes1[1].grid(True, alpha=0.3)
+    axes1[1].tick_params(labelsize=10)
+    
+    # 调整第一张图的布局
+    plt.tight_layout(pad=3.0)
+    plt.savefig(f'{output_dir}/problem2_concentration_analysis.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # 第二张图：BMI分组分析
+    fig2, axes2 = plt.subplots(1, 2, figsize=(16, 6))
     
     # 3. BMI分组的Y染色体浓度分布
     if 'BMI分组' in data.columns:
-        data.boxplot(column=y_col, by='BMI分组', ax=axes[1, 0])
-        axes[1, 0].set_title('不同BMI组的Y染色体浓度分布')
-        axes[1, 0].set_xlabel('BMI分组')
-        axes[1, 0].set_ylabel('Y染色体浓度')
+        # 使用seaborn创建更美观的箱线图
+        import seaborn as sns
+        sns.boxplot(data=data, x='BMI分组', y=y_col, ax=axes2[0])
+        axes2[0].set_title('不同BMI组的Y染色体浓度分布', fontsize=14, fontweight='bold', pad=20)
+        axes2[0].set_xlabel('BMI分组', fontsize=12)
+        axes2[0].set_ylabel('Y染色体浓度', fontsize=12)
+        axes2[0].tick_params(axis='x', rotation=45, labelsize=10)
+        axes2[0].tick_params(axis='y', labelsize=10)
+        axes2[0].grid(True, alpha=0.3)
     
     # 4. BMI组最佳时点对比
     if bmi_optimal_timing:
         groups = list(bmi_optimal_timing.keys())
         optimal_weeks = [bmi_optimal_timing[group]['optimal_week'] for group in groups]
         
-        axes[1, 1].bar(groups, optimal_weeks, color=['skyblue', 'lightgreen', 'orange', 'pink'])
-        axes[1, 1].set_xlabel('BMI分组')
-        axes[1, 1].set_ylabel('最佳检测时点(周)')
-        axes[1, 1].set_title('不同BMI组的最佳检测时点')
-        axes[1, 1].tick_params(axis='x', rotation=45)
+        # 为更多分组使用更多颜色
+        colors = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#FFC107', '#00BCD4']
+        bar_colors = colors[:len(groups)]
+        
+        bars = axes2[1].bar(groups, optimal_weeks, color=bar_colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+        axes2[1].set_xlabel('BMI分组', fontsize=12)
+        axes2[1].set_ylabel('最佳检测时点(周)', fontsize=12)
+        axes2[1].set_title('不同BMI组的最佳检测时点', fontsize=14, fontweight='bold', pad=20)
+        axes2[1].tick_params(axis='x', rotation=45, labelsize=10)
+        axes2[1].tick_params(axis='y', labelsize=10)
+        axes2[1].grid(True, alpha=0.3, axis='y')
+        
+        # 在柱状图上添加数值标签
+        for bar, week in zip(bars, optimal_weeks):
+            height = bar.get_height()
+            axes2[1].text(bar.get_x() + bar.get_width()/2., height + 0.05,
+                         f'{week:.1f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
     
-    plt.tight_layout()
-    plt.savefig(f'{output_dir}/problem2_analysis_plots.png', dpi=300, bbox_inches='tight')
+    # 调整第二张图的布局
+    plt.tight_layout(pad=3.0)
+    plt.savefig(f'{output_dir}/problem2_bmi_analysis.png', dpi=300, bbox_inches='tight')
     plt.show()
     
-    print(f"图表已保存到: {output_dir}/problem2_analysis_plots.png")
+    print(f"图表已保存到:")
+    print(f"  - 浓度分析图: {output_dir}/problem2_concentration_analysis.png")
+    print(f"  - BMI分析图: {output_dir}/problem2_bmi_analysis.png")
 
 def save_results(weekly_analysis, bmi_optimal_timing, output_dir):
     """
@@ -337,6 +379,16 @@ def main():
         
         print("\n=== 问题2分析完成 ===")
         print(f"总体最佳检测时点: 第{optimal_week:.1f}周")
+        print("\n=== BMI分组方案说明 ===")
+        print("已采用针对孕妇群体优化的BMI分组方案：")
+        print("- 偏瘦(<18.5)")
+        print("- 正常偏瘦(18.5-22.9)")
+        print("- 正常(23-25.9)")
+        print("- 超重偏轻(26-28.9)")
+        print("- 超重(29-31.9)")
+        print("- 肥胖I度(32-34.9)")
+        print("- 肥胖II度(≥35)")
+        print("\n该分组方案考虑了孕妇群体的特殊性，提供更精确的风险评估。")
         
         if bmi_optimal_timing:
             print("\n各BMI组最佳检测时点:")
