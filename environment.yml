@@ -1,0 +1,12 @@
+name: math_modeling  # 虚拟环境名称，可自定义
+channels:
+  - conda-forge  # 额外通道，确保部分包能正常安装
+  - defaults
+dependencies:
+#  - python=3.9.23# Python版本，兼容性较好
+#  - numpy=1.24.3
+#  - pandas=2.0.3
+#  - scipy=1.10.1
+#  - sympy=1.12
+#  - matplotlib=3.7.1
+#  - scikit-learn=1.3.0

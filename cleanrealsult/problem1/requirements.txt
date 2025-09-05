@@ -1,0 +1,27 @@
+# NIPT问题1解决方案依赖包
+# Y染色体浓度与孕周、BMI相关性分析
+
+# 数据处理和分析
+pandas>=1.5.0
+numpy>=1.21.0
+scipy>=1.9.0
+
+# 机器学习
+scikit-learn>=1.1.0
+
+# 数据可视化
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# Excel文件处理
+openpyxl>=3.0.0
+xlrd>=2.0.0
+
+# 统计分析
+statsmodels>=0.13.0
+
+# 其他工具
+tqdm>=4.64.0
+warnings
+os
+sys
