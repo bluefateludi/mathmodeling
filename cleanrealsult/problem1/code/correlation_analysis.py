@@ -113,10 +113,14 @@ class NIPTCorrelationAnalysis:
         
         # 如果Y染色体浓度列存在，进行具体分析
         y_col = None
-        for col in self.data.columns:
-            if 'Y' in col and ('染色体' in col or '浓度' in col):
-                y_col = col
-                break
+        # 优先选择Y染色体浓度
+        if 'Y染色体浓度' in self.data.columns:
+            y_col = 'Y染色体浓度'
+        else:
+            for col in self.data.columns:
+                if 'Y' in col and ('染色体' in col or '浓度' in col):
+                    y_col = col
+                    break
         
         if y_col:
             print(f"\n=== {y_col}与其他变量的相关性 ===")
@@ -151,10 +155,14 @@ class NIPTCorrelationAnalysis:
         
         # 寻找目标变量
         y_col = None
-        for col in self.data.columns:
-            if 'Y' in col and ('染色体' in col or '浓度' in col):
-                y_col = col
-                break
+        # 优先选择Y染色体浓度
+        if 'Y染色体浓度' in self.data.columns:
+            y_col = 'Y染色体浓度'
+        else:
+            for col in self.data.columns:
+                if 'Y' in col and ('染色体' in col or '浓度' in col):
+                    y_col = col
+                    break
         
         if not y_col:
             print("未找到Y染色体浓度相关列")
@@ -196,12 +204,14 @@ class NIPTCorrelationAnalysis:
         print(f"回归系数: {dict(zip(feature_cols, self.model.coef_))}")
         print(f"截距: {self.model.intercept_:.4f}")
         
-        # 构建回归方程
+        # 构建回归方程（显示名称优化）
         equation = f"{y_col} = {self.model.intercept_:.4f}"
         for i, col in enumerate(feature_cols):
             coef = self.model.coef_[i]
             sign = '+' if coef >= 0 else ''
-            equation += f" {sign}{coef:.4f}*{col}"
+            # 将检测孕周显示为检测天数
+            display_col = '检测天数' if '检测孕周' in col else col
+            equation += f" {sign}{coef:.4f}*{display_col}"
         
         print(f"\n回归方程：{equation}")
         
@@ -288,12 +298,20 @@ class NIPTCorrelationAnalysis:
         fig, axes = plt.subplots(1, 3, figsize=(18, 6))
         fig.suptitle('NIPT问题1：Y染色体浓度分析', fontsize=16, fontweight='bold')
         
-        # 获取Y染色体相关列
+        # 获取Y染色体相关列，优先选择浓度
         y_col = None
-        for col in self.data.columns:
-            if 'Y' in col and ('染色体' in col or '浓度' in col or 'Z值' in col):
-                y_col = col
-                break
+        if 'Y染色体浓度' in self.data.columns:
+            y_col = 'Y染色体浓度'
+        else:
+            for col in self.data.columns:
+                if 'Y' in col and '浓度' in col:
+                    y_col = col
+                    break
+            if not y_col:
+                for col in self.data.columns:
+                    if 'Y' in col and ('染色体' in col or 'Z值' in col):
+                        y_col = col
+                        break
         
         # 1. Y染色体浓度分布
         if y_col:
@@ -303,18 +321,20 @@ class NIPTCorrelationAnalysis:
             axes[0].set_ylabel('频数', fontsize=12)
             axes[0].grid(True, alpha=0.3)
         
-        # 2. 散点图：Y染色体浓度 vs 孕周
+        # 2. 散点图：Y染色体浓度 vs 检测天数
         week_col = None
         for col in self.data.columns:
-            if '孕周' in col:
+            if '检测孕周' in col:
                 week_col = col
                 break
+        # 将变量名显示为检测天数
+        week_display_name = '检测天数' if week_col else None
         
         if y_col and week_col:
             axes[1].scatter(self.data[week_col], self.data[y_col], alpha=0.6, color='blue', s=20)
-            axes[1].set_xlabel(week_col, fontsize=12)
+            axes[1].set_xlabel(week_display_name, fontsize=12)
             axes[1].set_ylabel(y_col, fontsize=12)
-            axes[1].set_title(f'{y_col} vs {week_col}', fontsize=14, fontweight='bold')
+            axes[1].set_title(f'{y_col} vs {week_display_name}', fontsize=14, fontweight='bold')
             axes[1].grid(True, alpha=0.3)
             
             # 添加趋势线
@@ -482,7 +502,7 @@ class NIPTCorrelationAnalysis:
 
 if __name__ == "__main__":
     # 使用示例
-    data_path = "d:/Program code/pythonproject/mathmodel/final_cleaned_data.xlsx"
+    data_path = "d:/Program code/pythonproject/mathmodel/(MAN)final_cleaned_data.xlsx"
     output_dir = "d:/Program code/pythonproject/mathmodel/cleanrealsult/problem1"
     
     # 创建分析实例

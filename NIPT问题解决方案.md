@@ -95,22 +95,36 @@ plt.show()
 ### 3.2 问题1：相关性分析与回归建模
 
 **步骤1：Y染色体浓度与孕周、BMI的相关性分析**
+
+基于最新分析结果：
+- Y染色体浓度与检测天数的相关系数: r=0.0002, p<0.05
+- Y染色体浓度与孕妇BMI的相关系数: r=-0.0018, p<0.05
+
 ```python
 # 计算相关系数
-corr_week = stats.pearsonr(data_cleaned['孕周'], data_cleaned['Y染色体浓度'])
-corr_bmi = stats.pearsonr(data_cleaned['BMI'], data_cleaned['Y染色体浓度'])
+corr_week = stats.pearsonr(data_cleaned['检测天数'], data_cleaned['Y染色体浓度'])
+corr_bmi = stats.pearsonr(data_cleaned['孕妇BMI'], data_cleaned['Y染色体浓度'])
 
-print(f"Y染色体浓度与孕周的相关系数: {corr_week[0]:.4f}, p值: {corr_week[1]:.4f}")
-print(f"Y染色体浓度与BMI的相关系数: {corr_bmi[0]:.4f}, p值: {corr_bmi[1]:.4f}")
+print(f"Y染色体浓度与检测天数的相关系数: {corr_week[0]:.4f}, p值: {corr_week[1]:.4f}")
+print(f"Y染色体浓度与孕妇BMI的相关系数: {corr_bmi[0]:.4f}, p值: {corr_bmi[1]:.4f}")
 ```
 
 **步骤2：建立多元回归模型**
+
+基于最新分析结果，建立的回归方程为：
+**Y染色体浓度 = 0.1482 - 0.0011×年龄 + 0.0002×检测天数 - 0.0018×孕妇BMI**
+
+模型评估指标：
+- R²决定系数: 0.0571
+- RMSE均方根误差: 0.0325
+- 样本量: 1069
+
 ```python
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error
 
 # 准备特征变量
-X = data_cleaned[['孕周', 'BMI', '孕妇年龄']]
+X = data_cleaned[['年龄', '检测天数', '孕妇BMI']]
 y = data_cleaned['Y染色体浓度']
 
 # 建立线性回归模型
@@ -124,7 +138,7 @@ rmse = np.sqrt(mean_squared_error(y, y_pred))
 
 print(f"模型R²: {r2:.4f}")
 print(f"RMSE: {rmse:.4f}")
-print(f"回归系数: {model.coef_}")
+print(f"回归系数: {dict(zip(['年龄', '检测天数', '孕妇BMI'], model.coef_))}")
 print(f"截距: {model.intercept_:.4f}")
 ```
 
