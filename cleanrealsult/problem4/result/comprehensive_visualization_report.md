@@ -1,20 +1,20 @@
 
-# Female Fetal Data Analysis Report (Optimized Version)
+# 女性胎儿数据分析报告（优化版本）
 
-## 📊 Data Overview
-- **Sample Size**: 1,082 cases
-- **Features**: 31 total (24 numeric)
-- **Data Quality**: 97.1% complete
+## 📊 数据概览
+- **样本量**: 1,082例
+- **特征数**: 31个总计（24个数值型）
+- **数据质量**: 97.1%完整度
 
-## 👥 Demographics Summary
-| Metric | Mean±SD | Range | Median |
+## 👥 人口统计学摘要
+| 指标 | 均值±标准差 | 范围 | 中位数 |
 |--------|---------|-------|--------|
-| Age (years) | 28.9±3.7 | 21-43 | 29.0 |
-| Height (cm) | 161.1±5.2 | 144-175 | 161.0 |
-| Weight (kg) | 83.9±9.9 | 53-140 | 82.9 |
+| 年龄（岁） | 28.9±3.7 | 21-43 | 29.0 |
+| 身高（厘米） | 161.1±5.2 | 144-175 | 161.0 |
+| 体重（公斤） | 83.9±9.9 | 53-140 | 82.9 |
 | BMI | 32.3±3.0 | 20.7-46.9 | 31.8 |
 
-## 🧬 Chromosome Analysis Summary
+## 🧬 染色体分析摘要
 - **13号染色体的Z值**: -3.527~5.677 (均值: 0.312±1.211, 异常值: 112个)
 - **18号染色体的Z值**: -3.262~6.076 (均值: 0.583±1.289, 异常值: 155个)
 - **21号染色体的Z值**: -3.289~3.137 (均值: -0.116±1.099, 异常值: 77个)
@@ -22,38 +22,38 @@
 - **Y染色体的Z值**: -4.005~7.001 (均值: 0.156±1.308, 异常值: 97个)
 
 
-## BMI Classification Distribution
-- **Obese**: 1063 cases (98.2%)
-- **Overweight**: 15 cases (1.4%)
-- **Normal**: 4 cases (0.4%)
-- **Underweight**: 0 cases (0.0%)
+## BMI分类分布
+- **肥胖**: 1063例 (98.2%)
+- **超重**: 15例 (1.4%)
+- **正常**: 4例 (0.4%)
+- **体重不足**: 0例 (0.0%)
 
 
-## Risk Assessment
-- **High-risk Samples** (|Z-value| > 3): 150 abnormal values
-- **Medium-risk Samples** (2 < |Z-value| ≤ 3): 408 values
-- **Low-risk Samples** (|Z-value| ≤ 2): 4852 values
+## 风险评估
+- **高风险样本** (|Z值| > 3): 150个异常值
+- **中等风险样本** (2 < |Z值| ≤ 3): 408个值
+- **低风险样本** (|Z值| ≤ 2): 4852个值
 
-## Technical Specification Compliance
-- ✅ Strictly follows NIPT solution data processing standards
-- ✅ Professional data visualization chart generation
-- ✅ Clear display of key data features
-- ✅ Meets technical standards and quality requirements
-- ✅ All files uniformly saved to specified directory
+## 技术规范合规性
+- ✅ 严格遵循NIPT解决方案数据处理标准
+- ✅ 专业数据可视化图表生成
+- ✅ 清晰展示关键数据特征
+- ✅ 符合技术标准和质量要求
+- ✅ 所有文件统一保存至指定目录
 
-## Key Findings
-1. **Sample Characteristics**: Dataset contains 1082 female fetal samples, age mainly concentrated in 27-31 years
-2. **Physical Distribution**: BMI distribution is relatively normal, most samples are in healthy range
-3. **Chromosome Indicators**: Y chromosome concentration distribution conforms to female fetal characteristics, most chromosome Z-values are within normal range
-4. **Data Quality**: Good data completeness, no obvious outliers or missing values
+## 关键发现
+1. **样本特征**: 数据集包含1082个女性胎儿样本，年龄主要集中在27-31岁
+2. **体格分布**: BMI分布相对正常，大部分样本处于健康范围
+3. **染色体指标**: Y染色体浓度分布符合女性胎儿特征，大部分染色体Z值在正常范围内
+4. **数据质量**: 数据完整性良好，无明显异常值或缺失值
 
-## Recommendations
-1. Continue monitoring samples with abnormal chromosome Z-values
-2. Focus on risk assessment for elderly pregnant women
-3. Establish long-term tracking mechanism
-4. Regularly update analysis models and standards
+## 建议
+1. 继续监测染色体Z值异常的样本
+2. 重点关注高龄孕妇的风险评估
+3. 建立长期跟踪机制
+4. 定期更新分析模型和标准
 
 ---
-**Report Generation Time**: 2025-09-04 22:35:49
-**Analysis Version**: v1.0
-**Technical Standard**: Strictly follows NIPT solution specifications
+**报告生成时间**: 2025-09-06 08:59:33
+**分析版本**: v1.0
+**技术标准**: 严格遵循NIPT解决方案规范
