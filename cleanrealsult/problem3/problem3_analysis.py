@@ -31,6 +31,9 @@ warnings.filterwarnings('ignore')
 plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
+# 新增：文件与路径操作
+import os
+
 class Problem3Analyzer:
     """
     问题3：多因子综合判定模型分析器
@@ -351,7 +354,217 @@ class Problem3Analyzer:
         
         self.error_results = error_results
         return True
-    
+
+    # 新增：蒙特卡洛敏感性模拟
+    def monte_carlo_simulation(self, n_iter: int = 200, error_levels=None):
+        """
+        基于浓度列的蒙特卡洛模拟敏感性分析（重复扰动n_iter次，估计一致性/假阳性/假阴性分布）
+        """
+        if self.data is None:
+            print("请先加载数据")
+            return False
+        
+        if error_levels is None:
+            error_levels = [0.01, 0.05, 0.1, 0.15, 0.2]
+        
+        # 定位浓度列
+        concentration_cols = []
+        for col in self.data.columns:
+            if any(x in col for x in ['13号染色体', '18号染色体', '21号染色体']) and '_zscore' not in col:
+                if self.data[col].dtype in [np.float64, np.int64]:
+                    concentration_cols.append(col)
+        if not concentration_cols:
+            print("未找到染色体浓度列，跳过蒙特卡洛模拟")
+            return True
+        
+        print("\n=== 蒙特卡洛敏感性模拟 ===")
+        mc_results = {}
+        original_labels = self.data['异常标签'].values
+        rng = np.random.default_rng(42)
+        
+        for lvl in error_levels:
+            cons_list, fp_list, fn_list = [], [], []
+            for _ in range(n_iter):
+                data_err = self.data.copy()
+                # 对每个浓度列添加噪声
+                for col in concentration_cols:
+                    std = data_err[col].std()
+                    noise = rng.normal(0, lvl * std, size=len(data_err))
+                    data_err[col] = data_err[col] + noise
+                    # 更新zscore
+                    m = data_err[col].mean()
+                    s = data_err[col].std(ddof=0) if data_err[col].std() == 0 else data_err[col].std()
+                    data_err[f'{col}_zscore'] = (data_err[col] - m) / (s if s != 0 else 1e-8)
+                # 重新打标
+                z_cols = [c for c in data_err.columns if c.endswith('_zscore')]
+                err_label = np.zeros(len(data_err), dtype=int)
+                for c in z_cols:
+                    err_label = np.logical_or(err_label, (np.abs(data_err[c]) > 2.0)).astype(int)
+                # 统计
+                cons = (original_labels == err_label).mean()
+                fp = ((original_labels == 0) & (err_label == 1)).mean()
+                fn = ((original_labels == 1) & (err_label == 0)).mean()
+                cons_list.append(cons)
+                fp_list.append(fp)
+                fn_list.append(fn)
+            
+            def mean_ci(a):
+                a = np.array(a)
+                mean = a.mean()
+                low, high = np.percentile(a, [2.5, 97.5])
+                return mean, low, high
+            
+            cons_mean, cons_low, cons_high = mean_ci(cons_list)
+            fp_mean, fp_low, fp_high = mean_ci(fp_list)
+            fn_mean, fn_low, fn_high = mean_ci(fn_list)
+            mc_results[lvl] = {
+                'consistency': {'mean': cons_mean, 'low': cons_low, 'high': cons_high},
+                'false_positive_rate': {'mean': fp_mean, 'low': fp_low, 'high': fp_high},
+                'false_negative_rate': {'mean': fn_mean, 'low': fn_low, 'high': fn_high}
+            }
+            print(f"误差{lvl*100:.0f}% → 一致性均值={cons_mean:.4f} [95%CI {cons_low:.4f}, {cons_high:.4f}]；FP={fp_mean:.4f}；FN={fn_mean:.4f}")
+        
+        # 保存结果与可视化
+        self.monte_carlo_results = mc_results
+        try:
+            fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+            x = [int(l*100) for l in error_levels]
+            # 一致性
+            y = [mc_results[l]['consistency']['mean'] for l in error_levels]
+            lo = [mc_results[l]['consistency']['low'] for l in error_levels]
+            hi = [mc_results[l]['consistency']['high'] for l in error_levels]
+            axes[0].plot(x, y, 'o-', label='一致性')
+            axes[0].fill_between(x, lo, hi, alpha=0.2)
+            axes[0].set_title('蒙特卡洛：标签一致性 vs 检测误差')
+            axes[0].set_xlabel('检测误差(%)')
+            axes[0].set_ylabel('一致性')
+            axes[0].set_ylim(0, 1)
+            axes[0].grid(alpha=0.3)
+            # FP
+            y = [mc_results[l]['false_positive_rate']['mean'] for l in error_levels]
+            lo = [mc_results[l]['false_positive_rate']['low'] for l in error_levels]
+            hi = [mc_results[l]['false_positive_rate']['high'] for l in error_levels]
+            axes[1].plot(x, y, 'o-', color='tab:orange', label='假阳性率')
+            axes[1].fill_between(x, lo, hi, alpha=0.2, color='tab:orange')
+            axes[1].set_title('蒙特卡洛：假阳性率 vs 检测误差')
+            axes[1].set_xlabel('检测误差(%)')
+            axes[1].set_ylabel('比例')
+            axes[1].set_ylim(0, 1)
+            axes[1].grid(alpha=0.3)
+            # FN
+            y = [mc_results[l]['false_negative_rate']['mean'] for l in error_levels]
+            lo = [mc_results[l]['false_negative_rate']['low'] for l in error_levels]
+            hi = [mc_results[l]['false_negative_rate']['high'] for l in error_levels]
+            axes[2].plot(x, y, 'o-', color='tab:red', label='假阴性率')
+            axes[2].fill_between(x, lo, hi, alpha=0.2, color='tab:red')
+            axes[2].set_title('蒙特卡洛：假阴性率 vs 检测误差')
+            axes[2].set_xlabel('检测误差(%)')
+            axes[2].set_ylabel('比例')
+            axes[2].set_ylim(0, 1)
+            axes[2].grid(alpha=0.3)
+            plt.tight_layout()
+            out_path = 'problem3_monte_carlo_sensitivity.png'
+            plt.savefig(out_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"蒙特卡洛敏感性图已保存：{out_path}")
+        except Exception as e:
+            print(f"蒙特卡洛可视化生成失败：{e}")
+        return True
+
+    # 新增：统计性检验分析（t检验、单因素ANOVA、Yates/卡方）
+    def statistical_tests_analysis(self):
+        if self.data is None:
+            print("请先加载数据")
+            return False
+        print("\n=== 统计性检验分析 ===")
+        # 确保BMI分组存在
+        if 'BMI分组' not in self.data.columns:
+            bmi_col = None
+            for col in self.data.columns:
+                if 'BMI' in col:
+                    bmi_col = col
+                    break
+            if bmi_col is not None:
+                def categorize_bmi(bmi):
+                    if bmi < 18.5:
+                        return '偏瘦'
+                    elif bmi < 25:
+                        return '正常'
+                    elif bmi < 30:
+                        return '超重'
+                    else:
+                        return '肥胖'
+                self.data['BMI分组'] = self.data[bmi_col].apply(categorize_bmi)
+        
+        test_summary = {}
+        # 选择一个代表性zscore列
+        z_cols = [c for c in self.data.columns if c.endswith('_zscore')]
+        selected_metric = z_cols[0] if z_cols else None
+        
+        # 1) t检验：正常 vs 肥胖（如果样本充足）
+        if selected_metric and 'BMI分组' in self.data.columns:
+            grp_a = self.data[self.data['BMI分组'] == '正常'][selected_metric].dropna()
+            grp_b = self.data[self.data['BMI分组'] == '肥胖'][selected_metric].dropna()
+            if len(grp_a) >= 3 and len(grp_b) >= 3:
+                t_stat, p_val = stats.ttest_ind(grp_a, grp_b, equal_var=False)
+                test_summary['t检验(BMI 正常 vs 肥胖)'] = {'t': float(t_stat), 'p': float(p_val), 'n1': int(len(grp_a)), 'n2': int(len(grp_b)), '指标': selected_metric}
+                print(f"t检验(正常 vs 肥胖) on {selected_metric}: t={t_stat:.4f}, p={p_val:.6f}")
+        
+        # 2) 单因素ANOVA：BMI四组在selected_metric上的差异
+        if selected_metric and 'BMI分组' in self.data.columns:
+            groups = [g[selected_metric].dropna().values for name, g in self.data.groupby('BMI分组') if len(g) >= 3]
+            if len(groups) >= 2:
+                f_stat, p_val = stats.f_oneway(*groups)
+                test_summary['单因素ANOVA(BMI分组)'] = {'F': float(f_stat), 'p': float(p_val), '组数': int(len(groups)), '指标': selected_metric}
+                print(f"ANOVA(BMI分组) on {selected_metric}: F={f_stat:.4f}, p={p_val:.6f}")
+        
+        # 3) Yates/卡方：BMI二分类(<=25 vs >25) 与 异常标签
+        if 'BMI分组' in self.data.columns and '异常标签' in self.data.columns:
+            bmi_binary = self.data['BMI分组'].map(lambda x: '≤25(偏瘦/正常)' if x in ['偏瘦', '正常'] else '＞25(超重/肥胖)')
+            contingency = pd.crosstab(bmi_binary, self.data['异常标签'])
+            if contingency.shape == (2, 2):
+                chi2, p_val, dof, _ = stats.chi2_contingency(contingency, correction=True)
+                test_summary['Yates校正卡方(BMI二分类×异常)'] = {'chi2': float(chi2), 'p': float(p_val), 'df': int(dof), '表': contingency.values.tolist()}
+                print(f"Yates校正卡方: χ²={chi2:.4f}, p={p_val:.6f}, dof={dof}")
+            else:
+                chi2, p_val, dof, _ = stats.chi2_contingency(contingency, correction=False)
+                test_summary['卡方检验(BMI分组×异常)'] = {'chi2': float(chi2), 'p': float(p_val), 'df': int(dof), '表': contingency.values.tolist()}
+                print(f"卡方检验: χ²={chi2:.4f}, p={p_val:.6f}, dof={dof}")
+        
+        self.stat_tests = test_summary
+        
+        # 可视化：BMI分组的selected_metric均值与异常率
+        try:
+            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+            if 'BMI分组' in self.data.columns:
+                order = ['偏瘦', '正常', '超重', '肥胖']
+                # 左：指标均值
+                if selected_metric:
+                    means = self.data.groupby('BMI分组')[selected_metric].mean().reindex(order)
+                    stds = self.data.groupby('BMI分组')[selected_metric].std().reindex(order)
+                    axes[0].bar(range(len(order)), means.values, yerr=stds.values, capsize=4, color='skyblue')
+                    axes[0].set_xticks(range(len(order)))
+                    axes[0].set_xticklabels(order)
+                    axes[0].set_title(f'{selected_metric}在BMI分组的均值±SD')
+                    axes[0].set_ylabel(selected_metric)
+                # 右：异常率
+                if '异常标签' in self.data.columns:
+                    rates = self.data.groupby('BMI分组')['异常标签'].mean().reindex(order)
+                    axes[1].bar(range(len(order)), (rates.values*100), color='lightcoral')
+                    axes[1].set_xticks(range(len(order)))
+                    axes[1].set_xticklabels(order)
+                    axes[1].set_title('BMI分组的异常率(%)')
+                    axes[1].set_ylabel('异常率(%)')
+            plt.tight_layout()
+            out_path = 'problem3_stat_tests_plot.png'
+            plt.savefig(out_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"统计检验图已保存：{out_path}")
+        except Exception as e:
+            print(f"统计检验可视化失败：{e}")
+        
+        return True
+
     def bmi_stratification_analysis(self):
         """
         BMI分层分析
@@ -603,25 +816,30 @@ class Problem3Analyzer:
                              f"{result['false_positive_rate']:.4f} | {result['false_negative_rate']:.4f} |")
             report.append("\n")
         
-        # BMI分层建议
-        if 'BMI分组' in self.data.columns:
-            report.append("## 6. BMI分层检测建议\n")
-            
-            bmi_stats = self.data.groupby('BMI分组').agg({
-                '异常标签': ['count', 'sum', 'mean']
-            })
-            
-            for bmi_group in bmi_stats.index:
-                if pd.isna(bmi_group):
-                    continue
-                count = bmi_stats.loc[bmi_group, ('异常标签', 'count')]
-                abnormal_rate = bmi_stats.loc[bmi_group, ('异常标签', 'mean')]
-                report.append(f"- **{bmi_group}组** (n={count}): 异常率{abnormal_rate*100:.2f}%")
-            
+        # 新增：蒙特卡洛模拟结果
+        if hasattr(self, 'monte_carlo_results') and self.monte_carlo_results:
+            report.append("## 6. 蒙特卡洛敏感性模拟结果\n")
+            report.append("| 误差水平 | 一致性(均值) | 95%CI | 假阳性率(均值) | 95%CI | 假阴性率(均值) | 95%CI |")
+            report.append("|----------|--------------|-------|----------------|-------|----------------|-------|")
+            for lvl, res in self.monte_carlo_results.items():
+                c = res['consistency']; fp = res['false_positive_rate']; fn = res['false_negative_rate']
+                report.append(
+                    f"| {lvl*100:.0f}% | {c['mean']:.4f} | [{c['low']:.4f}, {c['high']:.4f}] | "
+                    f"{fp['mean']:.4f} | [{fp['low']:.4f}, {fp['high']:.4f}] | "
+                    f"{fn['mean']:.4f} | [{fn['low']:.4f}, {fn['high']:.4f}] |"
+                )
+            report.append("\n")
+        
+        # 新增：统计性检验结果
+        if hasattr(self, 'stat_tests') and self.stat_tests:
+            report.append("## 7. 统计性检验结果\n")
+            for name, vals in self.stat_tests.items():
+                kv = ", ".join([f"{k}={v}" for k, v in vals.items() if k != '表'])
+                report.append(f"- {name}：{kv}")
             report.append("\n")
         
         # 结论和建议
-        report.append("## 7. 结论与建议\n")
+        report.append("## 8. 结论与建议\n")
         
         # 找到最佳模型
         best_model = max(self.results.keys(), key=lambda x: self.results[x]['accuracy'])
@@ -642,6 +860,20 @@ class Problem3Analyzer:
         report.append("3. **个性化检测**: 根据BMI等因素制定个性化检测策略")
         report.append("4. **持续优化**: 随着数据积累持续优化模型参数")
         
+        # 图表汇总（嵌入图片）
+        report.append("\n## 9. 图表汇总\n")
+        figures = [
+            ('problem3_analysis_plots.png', '综合可视化面板'),
+            ('problem3_monte_carlo_sensitivity.png', '蒙特卡洛敏感性分析'),
+            ('problem3_stat_tests_plot.png', '统计性检验图'),
+            ('肥胖组对比_期望风险曲线图.png', '肥胖组对比：期望风险曲线'),
+            ('超重组对比_期望风险曲线图.png', '超重组对比：期望风险曲线'),
+        ]
+        for fn, title in figures:
+            if os.path.exists(fn):
+                report.append(f"### {title}\n")
+                report.append(f"![{title}]({fn})\n")
+        
         report.append("\n---\n")
         report.append(f"**报告生成时间**: {pd.Timestamp.now().strftime('%Y年%m月%d日 %H:%M:%S')}")
         report.append(f"**分析工具**: Python机器学习")
@@ -659,14 +891,14 @@ class Problem3Analyzer:
         print(report_content[:1000] + "..." if len(report_content) > 1000 else report_content)
         
         return True
-    
+
     def run_complete_analysis(self):
         """
         运行完整分析流程
         """
         print("开始问题3完整分析流程...")
         
-        # 执行分析步骤
+        # 执行分析步骤（新增：蒙特卡洛与统计检验）
         steps = [
             ("加载数据", self.load_data),
             ("数据预处理", self.data_preprocessing),
@@ -674,6 +906,8 @@ class Problem3Analyzer:
             ("交叉验证", self.cross_validation),
             ("特征重要性分析", self.feature_importance_analysis),
             ("检测误差影响分析", self.error_impact_analysis),
+            ("蒙特卡洛敏感性模拟", self.monte_carlo_simulation),
+            ("统计性检验分析", self.statistical_tests_analysis),
             ("BMI分层分析", self.bmi_stratification_analysis),
             ("生成可视化", self.generate_visualizations),
             ("生成报告", self.generate_report)
